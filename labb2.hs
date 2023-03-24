@@ -1,4 +1,5 @@
-module F2 where 
+-- Filip Larsson
+module F2 where   
 
 import Data.List
 import GHC.Exts.Heap (GenClosure(prof))
@@ -10,7 +11,8 @@ data MolSeq = MolSeq {name :: String, sequence :: String, molType :: MolType } d
 listfordna = [0,1,2,3]
 listforprotien = [0,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19]
 
-
+a = Profile{matrix=[[('A', 4), ('B', 0), ('C', 0), ('D', 0)], [('A', 1), ('B', 0), ('C', 1), ('D', 2)]], typ=DNA, sequenceAmount=4, nameofProfile="profile2"}
+b = Profile{matrix=[[('A', 0), ('B', 1), ('C', 2), ('D', 1)], [('A', 2), ('B',2), ('C', 0), ('D', 0)]], typ=DNA, sequenceAmount=4, nameofProfile="profile1"}
 
 -- 2.2 
 string2seq :: String -> String -> MolSeq
@@ -53,6 +55,8 @@ seqDistance molseq1 molseq2
 -- 3.1 
 data Profile = Profile {matrix :: [[(Char, Int)]], typ :: MolType, sequenceAmount :: Int, nameofProfile :: String} deriving (Show, Eq)
 
+
+nucleotides :: String
 nucleotides = "ACGT"
 aminoacids = sort "ARNDCEQGHILKMFPSTWYV"
 makeProfileMatrix :: [MolSeq] -> [[(Char, Int)]]
@@ -78,9 +82,10 @@ profileName (Profile _ _ _ nameofProfile) = nameofProfile
 profileFrequency :: Profile -> Int -> Char -> Double
 profileFrequency (Profile matrix _ sequenceAmount _) position letter = fromIntegral amount / fromIntegral sequenceAmount
     where 
-        amount = matrixAmount (matrix !! position) letter 
+        amount = matrixAmount (matrix !! position) letter
 
 matrixAmount :: [(Char, Int)] -> Char -> Int 
+matrixAmount [] _ = 0 
 matrixAmount (h:t) (letter)
     | fst h == letter = snd h 
     | otherwise = matrixAmount t letter 
@@ -94,24 +99,55 @@ molseqs2profile s molseqlist = Profile matrix typ sequenceAmount nameofProfile
         nameofProfile = s
 
 profileDistance :: Profile -> Profile -> Double
-    profileDistance profile1 profile2 = sumColumnDiffsOverRowsDna profile1 profile2 (profile1 matrix)
+profileDistance profile1 profile2 = sumColumnDiffsOverRows profile1 profile2 (matrix profile1)
 
---Tar in två profiler samt ett index och räknar ut differensen på givet index.
 indexDiff :: Profile -> Profile -> Char -> Int -> Double
-    indexDiff profile1 profile2 char int =
-        abs (profileFrequency profile1 int char - profileFrequency profile2 int char)
+indexDiff profile1 profile2 char int =
+    abs (profileFrequency profile1 int char - profileFrequency profile2 int char)
 
--- Tar in två profileer samt en lista med alla index för en kolumn, 
---Räknar sedan ut summan av differenserna i kolumnen.
-sumDiffsInColumnDna :: Profile -> Profile -> [(Char, Int)] -> Double
-    sumDiffsInColumnDna profile1 profile2 [] = 0
-    sumDiffsInColumnDna profile1 profile2 (h:t)
-    indexDiff profile1 profile2 head(h) tail(h) + sumDiffsInColumnDna profile1 profile2 t
+sumDiffsinColumn :: Profile -> Profile -> [(Char, Int)] -> Double
+sumDiffsinColumn profile1 profile2 [] = 0
+sumDiffsinColumn profile1 profile2 (h:t) =
+    indexDiff profile1 profile2 (fst h) (snd h) + sumDiffsinColumn profile1 profile2 t
 
-sumColumnDiffsOverRowsDna :: Profile -> Profile -> [[(Char, Int)]] -> Double
-    sumColumnDiffsOverRowsDna profile1 profile2 matrix =
-    sumDiffsInColumnDna profile1 profile2 head(matrix) + sumColumnDiffsOverRowsDna profile1 profile2 tail(matrix)
+sumColumnDiffsOverRows :: Profile -> Profile -> [[(Char, Int)]] -> Double
+sumColumnDiffsOverRows profile1 profile2 [] = 0
+sumColumnDiffsOverRows profile1 profile2 (h:t) =
+    sumDiffsinColumn profile1 profile2 h + sumColumnDiffsOverRows profile1 profile2 t
 
- 
+class Evol object where
+    evolname :: object -> String 
+    distance :: object -> object -> Double
+
+    distancematrix :: [object] -> [(String, String, Double)]
+    distancematrix [] = []
+    distancematrix object = comparehead object 0 ++ distancematrix (tail object)
+
+
+    comparehead :: [object] -> Int -> [(String, String, Double)]
+    comparehead object number 
+        | number < length object = (evolname headname, evolname tailname , distance headname tailname) : comparehead object (number+1)
+        | otherwise = [] 
+        where 
+            headname = head object 
+            tailname = object !! number 
+
+
+    
+
+
+
+
+
+
+
+
+instance Evol MolSeq where
+    evolname = seqName
+    distance = seqDistance
+
+instance Evol Profile where 
+    evolname = nameofProfile
+    distance = profileDistance
 
 
